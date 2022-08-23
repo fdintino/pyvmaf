@@ -1,5 +1,5 @@
 from .core import Vmaf
 
 
-__all__ = ['calculate']
-__version__ = '1.2.2'
+__all__ = ['Vmaf']
+__version__ = '1.0.0a1'
