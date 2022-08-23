@@ -136,7 +136,7 @@ EOF
               -Dbuilt_in_models=true \
              "${meson_flags[@]}" \
         && SCCACHE_DIR="$SCCACHE_DIR" ninja -vC libvmaf/build install)
-    if [ ! -n "$IS_MACOS" ]; then
+    if [ -n "$IS_MACOS" ]; then
       perl -pi -e 's/^(Libs: [^\n]+)$/$1 -lstdc++/' $BUILD_PREFIX/lib/pkgconfig/libvmaf.pc
     fi
     echo "::endgroup::"
@@ -206,7 +206,7 @@ function pre_build {
 
     build_vmaf
 
-    export LDFLAGS="$LDFLAGS -static-libgcc -static-libstdc++"
+    # export LDFLAGS="$LDFLAGS -static-libgcc -static-libstdc++"
 
     echo "::group::Build wheel"
 }
