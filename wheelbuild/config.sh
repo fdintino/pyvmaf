@@ -129,6 +129,7 @@ EOF
               --buildtype=release \
               -Denable_tests=false \
               -Denable_docs=false \
+              -Denable_float=true \
               -Dbuilt_in_models=true \
              "${meson_flags[@]}" \
         && SCCACHE_DIR="$SCCACHE_DIR" ninja -vC libvmaf/build install)
