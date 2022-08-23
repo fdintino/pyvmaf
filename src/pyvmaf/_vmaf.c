@@ -3,6 +3,16 @@
 #include <Python.h>
 #include <libvmaf/libvmaf.h>
 
+#if PY_VERSION_HEX < 0x03030000
+#define PyUnicode_AsUTF8 PyString_AsString
+#endif
+
+#if PY_VERSION_HEX < 0x03000000
+#define PyText_Type PyString_Type
+#else
+#define PyText_Type PyUnicode_Type
+#endif
+
 typedef struct {
     PyObject_HEAD
     VmafContext *context;
@@ -172,7 +182,7 @@ fread_to_bytes(const char *filename) {
     FILE *fp;
     PyObject *py_bytes;
     if (stat(filename, &info) == -1) {
-        PyErr_Format(PyExc_RuntimeError, "could not open file", filename);
+        PyErr_Format(PyExc_RuntimeError, "could not open file \"%s\"", filename);
         return NULL;
     }
 
@@ -244,7 +254,7 @@ _pyvmaf_add_feature(VmafObject *self, PyObject *args) {
             PyErr_SetString(PyExc_ValueError, "Could not read options dict");
             goto end;
         }
-        if (key->ob_type != &PyUnicode_Type || val->ob_type != &PyUnicode_Type) {
+        if (key->ob_type != &PyText_Type || val->ob_type != &PyText_Type) {
             PyErr_SetString(PyExc_ValueError, "options dict key-values must be str");
             goto end;
         }

@@ -1,6 +1,10 @@
-from typing import Optional, Union
 import json
 from . import _vmaf
+
+try:
+    from typing import Optional, Union
+except ImportError:
+    pass
 
 
 def normalize_image(im):
@@ -30,15 +34,11 @@ def check_size_tuple(size):
     return size
 
 
-class Vmaf:
-
-    models = None
-    log_level = 0
-
+class Vmaf(object):
     def __init__(
         self,
-        model_version: Optional[str] = None,
-        log_level: Optional[Union[str, int]] = None,
+        model_version=None,  # type: Optional[str]
+        log_level=None,  # type: Optional[Union[str, int]]
     ):
         self.model_version = model_version
         self.log_level = log_level or 0
@@ -53,11 +53,12 @@ class Vmaf:
         for alias, path in self.loaded_models:
             self._context.model_load(alias, path)
 
-    def model_load(self, alias: str, path: str):
+    def model_load(self, alias, path):
+        # type: (str, str) -> None
         self._context.model_load(alias, path)
         self.loaded_models.append((alias, path))
 
-    def add_feature(self, name: str, options=None):
+    def add_feature(self, name, options=None):
         options = options or {}
         self._context.add_feature(name, options or {})
         self.added_features.append((name, options))

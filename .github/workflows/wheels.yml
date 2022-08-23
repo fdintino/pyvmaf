@@ -1,0 +1,347 @@
+name: Wheels
+
+on: [push, pull_request]
+
+env:
+  REPO_DIR: pyvmaf
+  BUILD_DEPENDS: ""
+  TEST_DEPENDS: "pytest pillow"
+  MACOSX_DEPLOYMENT_TARGET: "10.10"
+  WHEEL_SDIR: wheelhouse
+  CONFIG_PATH: pyvmaf/wheelbuild/config.sh
+  VMAF_VERSION: 2.3.1
+
+jobs:
+  build:
+    name: ${{ matrix.python }} ${{ matrix.os-name }} ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ "ubuntu-20.04", "macOS-10.15" ]
+        python: [ "pypy3.7-7.3.3", "pypy3.6-7.3", "2.7", "3.6", "3.7", "3.8", "3.9", "3.10" ]
+        platform: [ "x86_64", "i686" ]
+        manylinux-version: [ "1", "2010" ]
+        macos-target: [ "10.10" ]
+        mb-ml-libc: [ "manylinux" ]
+        exclude:
+          - os: "macOS-10.15"
+            platform: "i686"
+          - os: "macOS-10.15"
+            manylinux-version: "1"
+          - python: "pypy3.7-7.3.3"
+            manylinux-version: "1"
+          - python: "pypy3.6-7.3"
+            manylinux-version: "1"
+          - python: "pypy3.7-7.3.3"
+            manylinux-version: "2010"
+          - python: "pypy3.6-7.3"
+            manylinux-version: "2010"
+          - python: "3.10"
+            manylinux-version: "1"
+        include:
+          - os: "macOS-10.15"
+            os-name: "osx"
+          - os: "ubuntu-20.04"
+            manylinux-version: "1"
+            os-name: "manylinux1"
+          - os: "ubuntu-20.04"
+            manylinux-version: "2010"
+            os-name: "manylinux2010"
+          - os: "macos-11"
+            os-name: "osx"
+            platform: "arm64"
+            python: "3.10"
+            macos-target: "11.0"
+          - os: "macos-11"
+            os-name: "osx"
+            platform: "arm64"
+            python: "3.9"
+            macos-target: "11.0"
+          - os: "macos-11"
+            os-name: "osx"
+            platform: "arm64"
+            python: "3.8"
+            macos-target: "11.0"
+          - os: "macos-11"
+            os-name: "osx"
+            platform: "arm64"
+            python: "3.7"
+            macos-target: "11.0"
+          - os: "macos-11"
+            os-name: "osx"
+            platform: "arm64"
+            python: "2.7"
+            macos-target: "11.0"
+          - python: "3.8"
+            platform: "x86_64"
+            mb-ml-libc: "musllinux"
+            os: "ubuntu-20.04"
+            os-name: "musllinux"
+            manylinux-version: ""
+          - python: "3.9"
+            platform: "x86_64"
+            mb-ml-libc: "musllinux"
+            os: "ubuntu-20.04"
+            os-name: "musllinux"
+            manylinux-version: ""
+          - python: "3.10"
+            platform: "x86_64"
+            mb-ml-libc: "musllinux"
+            os: "ubuntu-20.04"
+            os-name: "musllinux"
+            manylinux-version: ""
+          - python: "3.8"
+            platform: "aarch64"
+            os: "ubuntu-20.04"
+            os-name: "manylinux2014"
+            manylinux-version: "2014"
+          - python: "3.9"
+            platform: "aarch64"
+            os: "ubuntu-20.04"
+            os-name: "manylinux2014"
+            manylinux-version: "2014"
+          - python: "3.10"
+            platform: "aarch64"
+            os: "ubuntu-20.04"
+            os-name: "manylinux2014"
+            manylinux-version: "2014"
+    env:
+      BUILD_COMMIT: HEAD
+      PLAT: ${{ matrix.platform }}
+      MB_PYTHON_VERSION: ${{ matrix.python }}
+      TRAVIS_OS_NAME: ${{ matrix.os-name }}
+      MB_ML_VER: ${{ matrix.manylinux-version }}
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macos-target }}
+      MB_ML_LIBC: ${{ matrix.mb-ml-libc }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          path: pyvmaf
+
+      - name: Checkout dependencies
+        uses: actions/checkout@v2
+        with:
+          repository: fdintino/pillow-avif-plugin-depends
+          path: pyvmaf-depends
+
+      - name: Checkout multibuild
+        uses: actions/checkout@v2
+        with:
+          repository: multi-build/multibuild
+          path: multibuild
+          ref: 34e970c4bc448b73af0127615fc4583b4f247369
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+        if: ${{ matrix.platform == 'aarch64' }}
+
+      - name: Setup env_vars
+        run: echo "export VMAF_VERSION=${{ env.VMAF_VERSION }}" > env_vars.sh
+
+      - name: Cache build
+        id: build-cache
+        uses: actions/cache@v2
+        with:
+          path: pyvmaf/depends/vmaf-${{ env.VMAF_VERSION }}
+          key:
+            ${{ env.VMAF_VERSION }}-${{ hashFiles('pyvmaf/wheelbuild/*.sh', 'pyvmaf/.github/workflows/wheels.yml') }}-${{ matrix.os }}-${{ matrix.platform }}
+
+      - name: Cache sccache
+        uses: actions/cache@v2
+        with:
+          path: sccache
+          key:
+            sccache-${{ matrix.os }}-${{ matrix.os-name }}-${{ matrix.platform }}-${{ hashFiles('pyvmaf/wheelbuild/*.sh', 'pyvmaf/.github/workflows/wheels.yml', 'pyvmaf/depends/*', 'pyvmaf/**/*.py', 'pyvmaf/**/*.c') }}-${{ matrix.python }}
+          restore-keys: |
+            sccache-${{ matrix.os }}-${{ matrix.os-name }}-${{ matrix.platform }}-${{ hashFiles('pyvmaf/wheelbuild/*.sh', 'pyvmaf/.github/workflows/wheels.yml', 'pyvmaf/depends/*', 'pyvmaf/**/*.py', 'pyvmaf/**/*.c') }}-${{ matrix.python }}
+            sccache-${{ matrix.os }}-${{ matrix.os-name }}-${{ matrix.platform }}-${{ hashFiles('pyvmaf/wheelbuild/*.sh', 'pyvmaf/.github/workflows/wheels.yml', 'pyvmaf/depends/*', 'pyvmaf/**/*.py', 'pyvmaf/**/*.c') }}
+            sccache-${{ matrix.os }}-${{ matrix.os-name }}-${{ matrix.platform }}-
+
+      - name: Build Wheel
+        run: pyvmaf/wheelbuild/build.sh
+
+      - name: Fix Directory Permissions
+        run: |
+          sudo chown -R $(whoami):$(id -ng) sccache ||:
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: wheels
+          path: wheelhouse/*.whl
+
+  windows:
+    runs-on: windows-2019
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["2.7", "3.6", "3.7", "3.8", "3.9", "3.10"]
+        architecture: ["x64"]
+        include:
+          - architecture: "x64"
+            platform-vcvars: "x86_amd64"
+            platform-msbuild: "x64"
+    timeout-minutes: 30
+
+    name: ${{ matrix.python-version }} windows ${{ matrix.architecture }}
+
+    steps:
+    - name: Checkout pyvmaf
+      uses: actions/checkout@v2
+
+    - name: Checkout cached dependencies
+      uses: actions/checkout@v2
+      with:
+        repository: python-pillow/pillow-depends
+        path: winbuild\depends
+
+    - name: Cache pip
+      uses: actions/cache@v2
+      with:
+        path: ~\AppData\Local\pip\Cache
+        key:
+          ${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.architecture }}-${{ hashFiles('**/.github/workflows/test-windows.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.python-version }}-${{ matrix.architecture }}-
+          ${{ runner.os }}-${{ matrix.python-version }}-
+
+    # sets env: pythonLocation
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+        architecture: ${{ matrix.architecture }}
+
+    - name: python -m pip install wheel pytest pytest-cov mock
+      run: python -m pip install wheel pytest pytest-cov mock
+
+    - name: Install dependencies
+      id: install
+      run: |
+        7z x winbuild\depends\nasm-2.14.02-win64.zip "-o$env:RUNNER_WORKSPACE\"
+        echo "$env:RUNNER_WORKSPACE\nasm-2.14.02" >> $env:GITHUB_PATH
+
+        winbuild\depends\gs9533w32.exe /S
+        echo "C:\Program Files (x86)\gs\gs9.53.3\bin" >> $env:GITHUB_PATH
+
+        # make cache key depend on VS version
+        & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" | find """catalog_buildVersion""" | ForEach-Object { $a = $_.split(" ")[1]; echo "::set-output name=vs::$a" }
+      shell: pwsh
+
+    - name: Cache build
+      id: build-cache
+      uses: actions/cache@v2
+      with:
+        path: winbuild\build
+        key:
+          ${{ hashFiles('winbuild\build_prepare.py') }}-${{ hashFiles('.github\workflows\wheels.yml') }}-${{ env.pythonLocation }}-${{ steps.install.outputs.vs }}
+
+    - name: Prepare build
+      if: steps.build-cache.outputs.cache-hit != 'true'
+      run: |
+        & python.exe winbuild\build_prepare.py -v --python=$env:pythonLocation --srcdir
+      shell: pwsh
+
+    - name: Build dependencies / meson (python 2.7)
+      if: steps.build-cache.outputs.cache-hit != 'true' && matrix.python-version == '2.7'
+      run: "& winbuild\\build\\install_meson.cmd"
+
+    - name: Build dependencies / meson (python 3.x)
+      if: steps.build-cache.outputs.cache-hit != 'true' && matrix.python-version != '2.7'
+      run: python -m pip install meson
+      shell: cmd
+
+    - name: Build dependencies / vmaf
+      if: steps.build-cache.outputs.cache-hit != 'true'
+      run: "& winbuild\\build\\build_dep_vmaf.cmd"
+
+    - name: Install dependencies / Pillow
+      run: "& winbuild\\build\\install_pillow.cmd"
+
+    # trim ~150MB x 9
+    - name: Optimize build cache
+      if: steps.build-cache.outputs.cache-hit != 'true'
+      run: rmdir /S /Q winbuild\build\src
+      shell: cmd
+
+    - name: Build pyvmaf
+      run: "& winbuild\\build\\build_pyvmaf.cmd install"
+      shell: pwsh
+
+    # failing with PyPy3
+    - name: Enable heap verification
+      if: "!contains(matrix.python-version, 'pypy')"
+      run: "& 'C:\\Program Files (x86)\\Windows Kits\\10\\Debuggers\\x86\\gflags.exe' /p /enable $env:pythonLocation\\python.exe"
+
+    - name: Test pyvmaf
+      run: |
+        path %GITHUB_WORKSPACE%\\winbuild\\build\\bin;%PATH%
+        python.exe -m pytest -v -W always --cov pyvmaf --cov tests --cov-report term --cov-report xml tests
+      shell: cmd
+
+    - name: Prepare to upload errors
+      if: failure()
+      run: |
+        mkdir -p tests/errors
+      shell: pwsh
+
+    - name: Upload errors
+      uses: actions/upload-artifact@v2
+      if: failure()
+      with:
+        name: errors
+        path: tests/errors
+
+    - name: After success
+      run: |
+        coverage xml
+      shell: pwsh
+
+    - name: Upload coverage
+      uses: codecov/codecov-action@v1
+      with:
+        file: ./coverage.xml
+        flags: GHA_Windows
+        name: ${{ runner.os }} Python ${{ matrix.python-version }} ${{ matrix.architecture }}
+
+    - name: Build wheel
+      id: wheel
+      if: "github.event_name == 'push'"
+      run: |
+        for /f "tokens=3 delims=/" %%a in ("${{ github.ref }}") do echo ::set-output name=dist::dist-%%a
+        winbuild\\build\\build_pyvmaf.cmd bdist_wheel
+      shell: cmd
+
+    - uses: actions/upload-artifact@v2
+      if: "github.event_name == 'push'"
+      with:
+        name: wheels
+        path: dist\*.whl
+
+  success:
+    needs: [build, windows]
+    runs-on: ubuntu-20.04
+    name: Build Successful
+    steps:
+      - name: Success
+        run: echo Build Successful
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-20.04
+    if: "startsWith(github.ref, 'refs/tags/')"
+    needs: [build, windows]
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: wheels
+
+      - name: Upload Release
+        uses: fnkr/github-action-ghr@v1.3
+        env:
+          GHR_PATH: .
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
