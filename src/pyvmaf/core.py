@@ -83,6 +83,7 @@ class Vmaf(object):
             results = self._context.calculate(
                 ref_im_bytes, dist_im_bytes, width, height
             )
-            return json.loads(results)
+            data = json.loads(results)
+            return data["frames"][0]["metrics"]
         finally:
             self._reset_context()
