@@ -88,6 +88,9 @@ function build_vmaf {
     local ldflags="$LDFLAGS"
     local meson_flags=()
 
+    if [ ! -n "$IS_MACOS" ]; then
+        ldflags+=" -static-libgcc -static-libstdc++"
+    fi
     local CC="${CC:-gcc}"
     if [[ $(type -P sccache) ]]; then
         CC="sccache $CC"
@@ -106,8 +109,8 @@ ar    = 'ar'
 ld    = 'ld'
 strip = 'strip'
 [built-in options]
-c_args = '$CFLAGS'
-c_link_args = '$LDFLAGS'
+c_args = '$cflags'
+c_link_args = '$ldflags'
 [host_machine]
 system = 'darwin'
 cpu_family = 'aarch64'
@@ -202,6 +205,8 @@ function pre_build {
     fi
 
     build_vmaf
+
+    export LDFLAGS="$LDFLAGS -static-libgcc -static-libstdc++"
 
     echo "::group::Build wheel"
 }
