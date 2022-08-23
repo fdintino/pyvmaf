@@ -88,6 +88,12 @@ function build_vmaf {
     local ldflags="$LDFLAGS"
     local meson_flags=()
 
+    if [ -n "$IS_MACOS" ]; then
+        meson_flags=(--default-library=static)
+    else
+        ldflags+=" -Wl,--exclude-libs,ALL -static-libgcc -static-libstdc++"
+        meson_flags=(--default-library=shared)
+    fi
     local CC="${CC:-gcc}"
     if [[ $(type -P sccache) ]]; then
         CC="sccache $CC"
@@ -106,8 +112,8 @@ ar    = 'ar'
 ld    = 'ld'
 strip = 'strip'
 [built-in options]
-c_args = '$CFLAGS'
-c_link_args = '$LDFLAGS'
+c_args = '$cflags'
+c_link_args = '$ldflags'
 [host_machine]
 system = 'darwin'
 cpu_family = 'aarch64'
@@ -125,7 +131,6 @@ EOF
         && CFLAGS="$cflags" LDFLAGS="$ldflags" CC="$CC" \
            meson setup libvmaf libvmaf/build \
               "--prefix=${BUILD_PREFIX}" \
-              --default-library=static \
               --buildtype=release \
               -Denable_tests=false \
               -Denable_docs=false \
@@ -133,7 +138,7 @@ EOF
               -Dbuilt_in_models=true \
              "${meson_flags[@]}" \
         && SCCACHE_DIR="$SCCACHE_DIR" ninja -vC libvmaf/build install)
-    if [ ! -n "$IS_MACOS" ]; then
+    if [ -n "$IS_MACOS" ]; then
       perl -pi -e 's/^(Libs: [^\n]+)$/$1 -lstdc++/' $BUILD_PREFIX/lib/pkgconfig/libvmaf.pc
     fi
     echo "::endgroup::"
@@ -203,6 +208,8 @@ function pre_build {
 
     build_vmaf
 
+    # export LDFLAGS="$LDFLAGS -static-libgcc -static-libstdc++"
+
     echo "::group::Build wheel"
 }
 
@@ -245,3 +252,12 @@ if [ "$MB_PYTHON_VERSION" == "2.7" ]; then
         rmdir tmp_for_test  2>/dev/null || echo "Cannot remove tmp_for_test"
     }
 fi
+
+function pip_wheel_cmd {
+    local abs_wheelhouse=$1
+    local LDFLAGS="$LDFLAGS"
+    if [ ! -n "$IS_MACOS" ]; then
+        LDFLAGS="$LDFLAGS -Wl,--exclude-libs,ALL -static-libgcc -static-libstdc++"
+    fi
+    LDFLAGS="$LDFLAGS" pip wheel $(pip_opts) -w $abs_wheelhouse --no-deps .
+}
