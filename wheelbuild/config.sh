@@ -89,7 +89,7 @@ function build_vmaf {
     local meson_flags=()
 
     if [ ! -n "$IS_MACOS" ]; then
-        ldflags+=" -static-libgcc -static-libstdc++"
+        ldflags+=" -Wl,--exclude-libs,ALL -static-libgcc -static-libstdc++"
     fi
     local CC="${CC:-gcc}"
     if [[ $(type -P sccache) ]]; then
@@ -250,3 +250,12 @@ if [ "$MB_PYTHON_VERSION" == "2.7" ]; then
         rmdir tmp_for_test  2>/dev/null || echo "Cannot remove tmp_for_test"
     }
 fi
+
+function pip_wheel_cmd {
+    local abs_wheelhouse=$1
+    local LDFLAGS="$LDFLAGS"
+    if [ ! -n "$IS_MACOS" ]; then
+        LDFLAGS="$LDFLAGS -Wl,--exclude-libs,ALL -static-libgcc -static-libstdc++"
+    fi
+    LDFLAGS="$LDFLAGS" pip wheel $(pip_opts) -w $abs_wheelhouse --no-deps .
+}
