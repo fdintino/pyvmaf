@@ -128,7 +128,7 @@ EOF
         && CFLAGS="$cflags" LDFLAGS="$ldflags" CC="$CC" \
            meson setup libvmaf libvmaf/build \
               "--prefix=${BUILD_PREFIX}" \
-              --default-library=static \
+              --default-library=shared \
               --buildtype=release \
               -Denable_tests=false \
               -Denable_docs=false \
